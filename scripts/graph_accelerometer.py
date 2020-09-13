@@ -52,7 +52,6 @@ def plot_accel(data, logname):
 # Frequency graphing
 ######################################################################
 
-MAX_FREQ = 200.
 WINDOW_T_SEC = 0.5
 
 class CalibrationData:
@@ -75,14 +74,14 @@ def _smooth(x, N):
     w = np.blackman(N)
     return np.convolve(w / w.sum(), s, mode='valid')
 
-def calc_freq_response(data):
+def calc_freq_response(data, max_freq):
     N = data.shape[0]
     T = data[-1,0] - data[0,0]
     SAMPLING_FREQ = N / T
     # Round up to the nearest power of 2 for faster FFT
     M = _most_significant_bit(2 * int(SAMPLING_FREQ * WINDOW_T_SEC - 1))
     # 1.75 constant is just some guess for blackman window smoothing
-    smooth_window = int(1.75 * SAMPLING_FREQ / MAX_FREQ)
+    smooth_window = int(1.75 * SAMPLING_FREQ / max_freq)
     if N <= M or N <= smooth_window:
         return None
 
@@ -112,14 +111,14 @@ def calc_freq_response(data):
     pz_max = pz_avg.max(axis=1)
     return CalibrationData(fx, psd, px_max, py_max, pz_max)
 
-def plot_frequency(data, logname):
-    calibration_data = calc_freq_response(np.array(data))
+def plot_frequency(data, logname, max_freq):
+    calibration_data = calc_freq_response(np.array(data), max_freq)
     freqs = calibration_data.freq_bins
-    psd = calibration_data.psd_sum[freqs <= MAX_FREQ]
-    px = calibration_data.psd_x[freqs <= MAX_FREQ]
-    py = calibration_data.psd_y[freqs <= MAX_FREQ]
-    pz = calibration_data.psd_z[freqs <= MAX_FREQ]
-    freqs = freqs[freqs <= MAX_FREQ]
+    psd = calibration_data.psd_sum[freqs <= max_freq]
+    px = calibration_data.psd_x[freqs <= max_freq]
+    py = calibration_data.psd_y[freqs <= max_freq]
+    pz = calibration_data.psd_z[freqs <= max_freq]
+    freqs = freqs[freqs <= max_freq]
 
     fig, ax = matplotlib.pyplot.subplots()
     ax.set_title("Accelerometer data (%s)" % (logname,))
@@ -138,20 +137,20 @@ def plot_frequency(data, logname):
     fig.tight_layout()
     return fig
 
-def plot_compare_frequency(datas, lognames):
+def plot_compare_frequency(datas, lognames, max_freq):
     fig, ax = matplotlib.pyplot.subplots()
     ax.set_title("Accelerometer data")
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Power spectral density')
 
     for data, logname in zip(datas, lognames):
-        calibration_data = calc_freq_response(np.array(data))
+        calibration_data = calc_freq_response(np.array(data), max_freq)
         freqs = calibration_data.freq_bins
-        psd = calibration_data.psd_sum[freqs <= MAX_FREQ]
-        px = calibration_data.psd_x[freqs <= MAX_FREQ]
-        py = calibration_data.psd_y[freqs <= MAX_FREQ]
-        pz = calibration_data.psd_z[freqs <= MAX_FREQ]
-        freqs = freqs[freqs <= MAX_FREQ]
+        psd = calibration_data.psd_sum[freqs <= max_freq]
+        px = calibration_data.psd_x[freqs <= max_freq]
+        py = calibration_data.psd_y[freqs <= max_freq]
+        pz = calibration_data.psd_z[freqs <= max_freq]
+        freqs = freqs[freqs <= max_freq]
         ax.plot(freqs, psd, label=logname, alpha=0.6)
 
     ax.grid(True)
@@ -180,6 +179,8 @@ def main():
     opts = optparse.OptionParser(usage)
     opts.add_option("-o", "--output", type="string", dest="output",
                     default=None, help="filename of output graph")
+    opts.add_option("-f", "--max_freq", type="float", default=200.,
+                    help="maximum frequency to graph")
     opts.add_option("-r", "--raw", action="store_true",
                     help="graph raw accelerometer data")
     options, args = opts.parse_args()
@@ -194,9 +195,9 @@ def main():
     if options.raw:
         fig = plot_accel(datas[0], args[0])
     elif len(args) > 1:
-        fig = plot_compare_frequency(datas, args)
+        fig = plot_compare_frequency(datas, args, options.max_freq)
     else:
-        fig = plot_frequency(datas[0], args[0])
+        fig = plot_frequency(datas[0], args[0], options.max_freq)
 
     # Show graph
     if options.output is None:
