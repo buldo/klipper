@@ -138,6 +138,29 @@ def plot_frequency(data, logname):
     fig.tight_layout()
     return fig
 
+def plot_compare_frequency(datas, lognames):
+    fig, ax = matplotlib.pyplot.subplots()
+    ax.set_title("Accelerometer data")
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Power spectral density')
+
+    for data, logname in zip(datas, lognames):
+        calibration_data = calc_freq_response(np.array(data))
+        freqs = calibration_data.freq_bins
+        psd = calibration_data.psd_sum[freqs <= MAX_FREQ]
+        px = calibration_data.psd_x[freqs <= MAX_FREQ]
+        py = calibration_data.psd_y[freqs <= MAX_FREQ]
+        pz = calibration_data.psd_z[freqs <= MAX_FREQ]
+        freqs = freqs[freqs <= MAX_FREQ]
+        ax.plot(freqs, psd, label=logname, alpha=0.6)
+
+    ax.grid(True)
+    fontP = matplotlib.font_manager.FontProperties()
+    fontP.set_size('x-small')
+    ax.legend(loc='best', prop=fontP)
+    fig.tight_layout()
+    return fig
+
 
 ######################################################################
 # Startup
@@ -153,25 +176,27 @@ def setup_matplotlib(output_to_file):
 
 def main():
     # Parse command-line arguments
-    usage = "%prog [options] <log>"
+    usage = "%prog [options] <logs>"
     opts = optparse.OptionParser(usage)
     opts.add_option("-o", "--output", type="string", dest="output",
                     default=None, help="filename of output graph")
     opts.add_option("-r", "--raw", action="store_true",
                     help="graph raw accelerometer data")
     options, args = opts.parse_args()
-    if len(args) != 1:
+    if len(args) < 1:
         opts.error("Incorrect number of arguments")
 
     # Parse data
-    data = parse_log(args[0])
+    datas = [parse_log(fn) for fn in args]
 
     # Draw graph
     setup_matplotlib(options.output is not None)
     if options.raw:
-        fig = plot_accel(data, args[0])
+        fig = plot_accel(datas[0], args[0])
+    elif len(args) > 1:
+        fig = plot_compare_frequency(datas, args)
     else:
-        fig = plot_frequency(data, args[0])
+        fig = plot_frequency(datas[0], args[0])
 
     # Show graph
     if options.output is None:
